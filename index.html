@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <!-- 針對行動裝置優化：禁止使用者縮放、自動適應全螢幕 Viewport -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>粢涵的遊戲基地 - 測試環境</title>
+    <style>
+        /* 1. 全局樣式重置，確保無外邊距與捲軸 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* 防止手機上長按選取文字 */
+            -webkit-user-select: none;
+            -webkit-touch-callout: none; /* 禁用 iOS 彈出選單 */
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #1a1a1a; /* 畫布外部多餘空間填滿深灰色 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+
+        /* 2. Canvas 佈局：由 JS 動態控制寬高與位置 */
+        #gameCanvas {
+            background-color: #FDF6E3; /* 簡約溫馨的淡米色背景 */
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); /* 增加邊框陰影提升質感 */
+            touch-action: none; /* 停用瀏覽器預設的觸控行為（如滑動刷頁） */
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 遊戲主要畫布 -->
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        // ==========================================================================
+        // 1. 遊戲核心設定與常數定義 (Game Config)
+        // ==========================================================================
+        const VIRTUAL_WIDTH = 1024;  // 邏輯/虛擬畫布寬度 (4:3)
+        const VIRTUAL_HEIGHT = 768;  // 邏輯/虛擬畫布高度 (4:3)
+        const ASPECT_RATIO = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // 縮放與偏移狀態記錄變數（座標轉換的核心）
+        let scale = 1;        // 當前畫布相對於虛擬解析度的縮放比例
+        let offsetX = 0;      // 畫布在螢幕上的 Left 偏移量 (px)
+        let offsetY = 0;      // 畫布在螢幕上的 Top 偏移量 (px)
+
+        // 儲存測試觸控點的陣列：[{x, y}, ...]
+        const touchPoints = [];
+
+        // ==========================================================================
+        // 2. 響應式畫布縮放邏輯 (Aspect Ratio Preserved / Scale-to-Fit)
+        // ==========================================================================
+        function resizeCanvas() {
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const windowRatio = windowWidth / windowHeight;
+
+            let displayWidth, displayHeight;
+
+            // 根據螢幕長寬比計算 Scale-to-Fit 的實際顯示尺寸
+            if (windowRatio > ASPECT_RATIO) {
+                // 螢幕較寬（如 iPhone 橫螢幕），以高度為基準
+                displayHeight = windowHeight;
+                displayWidth = displayHeight * ASPECT_RATIO;
+            } else {
+                // 螢幕較窄或剛好（如 iPad 4:3），以寬度為基準
+                displayWidth = windowWidth;
+                displayHeight = displayWidth / ASPECT_RATIO;
+            }
+
+            // A. 設定 CSS 呈現尺寸（決定在螢幕上看起來多大）
+            canvas.style.width = `${displayWidth}px`;
+            canvas.style.height = `${displayHeight}px`;
+
+            // B. 設定 Canvas 內部實際繪圖解析度（恆定為 1024x768）
+            canvas.width = VIRTUAL_WIDTH;
+            canvas.height = VIRTUAL_HEIGHT;
+
+            // C. 計算幾何轉換參數（供座標轉換函數與 Bounding Box 使用）
+            const rect = canvas.getBoundingClientRect();
+            offsetX = rect.left;
+            offsetY = rect.top;
+            scale = displayWidth / VIRTUAL_WIDTH; // 螢幕像素 / 虛擬像素
+
+            // 調整尺寸後重新繪製畫面
+            render();
+        }
+
+        // ==========================================================================
+        // 3. 【核心技術】精準座標轉換函數 (Screen to Virtual Coordinate)
+        // ==========================================================================
+        /**
+         * 將瀏覽器事件（Pointer/Touch/Mouse）的 Client 座標轉換為 1024x768 虛擬座標
+         * @param {number} clientX - 點擊點的螢幕 X 座標
+         * @param {number} clientY - 點擊點的螢幕 Y 座標
+         * @returns {{x: number, y: number}} - 轉換後的 1024x768 虛擬座標
+         */
+        function getVirtualCoordinates(clientX, clientY) {
+            // 1. 扣除 Canvas 畫布相對於 Viewport 的偏移量 (Offset)
+            const canvasTouchX = clientX - offsetX;
+            const canvasTouchY = clientY - offsetY;
+
+            // 2. 除以當前縮放比例 (Scale)，換算回原生的 1024x768 空間
+            const virtualX = canvasTouchX / scale;
+            const virtualY = canvasTouchY / scale;
+
+            // 3. 四捨五入並限定邊界在 (0,0) 到 (1024, 768) 之間
+            return {
+                x: Math.min(Math.max(Math.round(virtualX), 0), VIRTUAL_WIDTH),
+                y: Math.min(Math.max(Math.round(virtualY), 0), VIRTUAL_HEIGHT)
+            };
+        }
+
+        // ==========================================================================
+        // 4. 事件監聽 (Event Listeners)
+        // ==========================================================================
+        // 統一使用 Pointer Events 兼顧 Touch 與 Mouse
+        canvas.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            
+            // 取得轉換後的虛擬座標
+            const pos = getVirtualCoordinates(e.clientX, e.clientY);
+            
+            // 記錄點擊位置
+            touchPoints.push(pos);
+            
+            // 限制最多儲存 10 個點，防止畫面過於雜亂
+            if (touchPoints.length > 10) {
+                touchPoints.shift();
+            }
+
+            render();
+        });
+
+        // 視窗大小改變或旋轉螢幕時觸發適應
+        window.addEventListener('resize', resizeCanvas);
+        window.addEventListener('orientationchange', resizeCanvas);
+
+        // ==========================================================================
+        // 5. 畫面繪製 logic (Render Engine)
+        // ==========================================================================
+        function render() {
+            // 1. 清空畫布（使用淡米色背景）
+            ctx.fillStyle = '#FDF6E3';
+            ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+
+            // 2. 繪製中央標題與指示文字
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            // 主標題：粢涵的遊戲基地 (測試環境)
+            ctx.font = 'bold 42px sans-serif';
+            ctx.fillStyle = '#4A3E3D'; // 溫馨深棕色
+            ctx.fillText('粢涵的遊戲基地 (測試環境)', VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 20);
+
+            // 說明文字
+            ctx.font = '20px sans-serif';
+            ctx.fillStyle = '#8C7B70';
+            ctx.fillText('點擊畫面上任意位置測試觸控座標轉換', VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 + 30);
+
+            // 3. 繪製玩家點擊的測試點與座標數據
+            touchPoints.forEach((pt, index) => {
+                const isLatest = index === touchPoints.length - 1;
+
+                // A. 繪製紅色圓點（最新點擊的點較大且有高亮效果）
+                ctx.beginPath();
+                ctx.arc(pt.x, pt.y, isLatest ? 12 : 8, 0, Math.PI * 2);
+                ctx.fillStyle = isLatest ? '#E74C3C' : 'rgba(231, 76, 60, 0.5)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.stroke();
+
+                // B. 繪製座標數值標籤
+                const text = `(${pt.x}, ${pt.y})`;
+                ctx.font = isLatest ? 'bold 18px monospace' : '14px monospace';
+                ctx.fillStyle = isLatest ? '#2C3E50' : '#7F8C8D';
+                
+                // 聰明的標籤偏移：防止文字超出虛擬畫布頂部
+                const textY = pt.y - 18 < 20 ? pt.y + 25 : pt.y - 18;
+                ctx.fillText(text, pt.x, textY);
+            });
+        }
+
+        // ==========================================================================
+        // 6. 初始化啟動 (Initialization)
+        // ==========================================================================
+        window.addEventListener('DOMContentLoaded', () => {
+            resizeCanvas(); // 初始計算畫布大小並執行首次繪製
+        });
+    </script>
+</body>
+</html>
