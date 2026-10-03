@@ -1,206 +1,240 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <!-- 針對行動裝置優化：禁止使用者縮放、自動適應全螢幕 Viewport -->
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>粢涵的遊戲基地 - 測試環境</title>
-    <style>
-        /* 1. 全局樣式重置，確保無外邊距與捲軸 */
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none; /* 防止手機上長按選取文字 */
-            -webkit-user-select: none;
-            -webkit-touch-callout: none; /* 禁用 iOS 彈出選單 */
-        }
-
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background-color: #1a1a1a; /* 畫布外部多餘空間填滿深灰色 */
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-
-        /* 2. Canvas 佈局：由 JS 動態控制寬高與位置 */
-        #gameCanvas {
-            background-color: #FDF6E3; /* 簡約溫馨的淡米色背景 */
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5); /* 增加邊框陰影提升質感 */
-            touch-action: none; /* 停用瀏覽器預設的觸控行為（如滑動刷頁） */
-            display: block;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>芝涵尋寶冒險</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      -webkit-user-select: none;
+      user-select: none;
+      touch-action: none; 
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #121212;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 92vw;               
+      max-width: 1024px;         
+      max-height: 80vh;          
+      
+      background-image: url('bg_photo.jpg'); 
+      background-size: 100% 100%;
+      background-position: center;
+      background-repeat: no-repeat;
+      
+      border-radius: 12px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      overflow: hidden;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    .ui-layer {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      z-index: 10;
+    }
+    .btn-attack {
+      width: 80px;
+      height: 80px;
+      font-size: 32px;
+      color: #fff;
+      background: linear-gradient(135deg, #ff4081, #ff80ab);
+      border: 3px solid rgba(255, 255, 255, 0.8);
+      border-radius: 50%;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      touch-action: manipulation;
+    }
+    .btn-attack:active {
+      transform: scale(0.88);
+      background: #ff4081;
+    }
+    .instruction {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 14px;
+      pointer-events: none;
+      backdrop-filter: blur(4px);
+    }
+  </style>
 </head>
 <body>
 
-    <!-- 遊戲主要畫布 -->
+  <div id="game-container">
+    <div class="instruction">👆 點擊畫面移動，讓「劍氣範圍」對準目標</div>
     <canvas id="gameCanvas"></canvas>
+    
+    <div class="ui-layer">
+      <div class="btn-attack" id="attackBtn">⚔️</div>
+    </div>
+  </div>
 
-    <script>
-        // ==========================================================================
-        // 1. 遊戲核心設定與常數定義 (Game Config)
-        // ==========================================================================
-        const VIRTUAL_WIDTH = 1024;  // 邏輯/虛擬畫布寬度 (4:3)
-        const VIRTUAL_HEIGHT = 768;  // 邏輯/虛擬畫布高度 (4:3)
-        const ASPECT_RATIO = VIRTUAL_WIDTH / VIRTUAL_HEIGHT;
+  <script>
+    const container = document.getElementById('game-container');
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const attackBtn = document.getElementById('attackBtn');
 
-        const canvas = document.getElementById('gameCanvas');
-        const ctx = canvas.getContext('2d');
+    // --- 1. 角色屬性與設定 ---
+    const player = {
+      x: 0,
+      y: 0,
+      size: 400,          // 修改 1: 尺寸放大至 400
+      speed: 15,          // 修改 1: 移動速度提升至 15
+      targetX: 0,
+      targetY: 0,
+      frame: 0,
+      isAttacking: false,
+      
+      // 攻擊範圍參數 (相對於人物中心點)
+      hitboxOffsetX: 200, // 攻擊圈在人物偏右方 200px 處
+      hitboxOffsetY: 0,
+      hitboxRadius: 80    // 修改 2: 半徑縮小 50% (原比例對應為 160，現改為 80)
+    };
 
-        // 縮放與偏移狀態記錄變數（座標轉換的核心）
-        let scale = 1;        // 當前畫布相對於虛擬解析度的縮放比例
-        let offsetX = 0;      // 畫布在螢幕上的 Left 偏移量 (px)
-        let offsetY = 0;      // 畫布在螢幕上的 Top 偏移量 (px)
+    // --- 2. 自動讀取底圖 PNG 比例 ---
+    const bgImg = new Image();
+    bgImg.src = 'bg_photo.jpg';
+    bgImg.onload = () => {
+      canvas.width = bgImg.width;
+      canvas.height = bgImg.height;
+      container.style.aspectRatio = `${bgImg.width} / ${bgImg.height}`;
 
-        // 儲存測試觸控點的陣列：[{x, y}, ...]
-        const touchPoints = [];
+      player.x = canvas.width / 2;
+      player.y = canvas.height / 2;
+      player.targetX = player.x;
+      player.targetY = player.y;
 
-        // ==========================================================================
-        // 2. 響應式畫布縮放邏輯 (Aspect Ratio Preserved / Scale-to-Fit)
-        // ==========================================================================
-        function resizeCanvas() {
-            const windowWidth = window.innerWidth;
-            const windowHeight = window.innerHeight;
-            const windowRatio = windowWidth / windowHeight;
+      gameLoop();
+    };
 
-            let displayWidth, displayHeight;
+    // --- 3. 載入去背角色動作圖片 ---
+    const sources = ['frame1_nobg.png', 'frame2_nobg.png', 'frame3_nobg.png'];
+    const images = [];
+    let loadedCount = 0;
 
-            // 根據螢幕長寬比計算 Scale-to-Fit 的實際顯示尺寸
-            if (windowRatio > ASPECT_RATIO) {
-                // 螢幕較寬（如 iPhone 橫螢幕），以高度為基準
-                displayHeight = windowHeight;
-                displayWidth = displayHeight * ASPECT_RATIO;
-            } else {
-                // 螢幕較窄或剛好（如 iPad 4:3），以寬度為基準
-                displayWidth = windowWidth;
-                displayHeight = displayWidth / ASPECT_RATIO;
-            }
+    sources.forEach((src, idx) => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => loadedCount++;
+      images[idx] = img;
+    });
 
-            // A. 設定 CSS 呈現尺寸（決定在螢幕上看起來多大）
-            canvas.style.width = `${displayWidth}px`;
-            canvas.style.height = `${displayHeight}px`;
+    // --- 4. 遊戲主迴圈 (Game Loop) ---
+    function gameLoop() {
+      update();
+      draw();
+      requestAnimationFrame(gameLoop);
+    }
 
-            // B. 設定 Canvas 內部實際繪圖解析度（恆定為 1024x768）
-            canvas.width = VIRTUAL_WIDTH;
-            canvas.height = VIRTUAL_HEIGHT;
+    // --- 5. 移動邏輯更新 ---
+    function update() {
+      if (!player.isAttacking) {
+        let dx = player.targetX - player.x;
+        let dy = player.targetY - player.y;
+        let distance = Math.sqrt(dx * dx + dy * dy);
 
-            // C. 計算幾何轉換參數（供座標轉換函數與 Bounding Box 使用）
-            const rect = canvas.getBoundingClientRect();
-            offsetX = rect.left;
-            offsetY = rect.top;
-            scale = displayWidth / VIRTUAL_WIDTH; // 螢幕像素 / 虛擬像素
-
-            // 調整尺寸後重新繪製畫面
-            render();
+        if (distance > player.speed) {
+          player.x += (dx / distance) * player.speed;
+          player.y += (dy / distance) * player.speed;
+        } else {
+          player.x = player.targetX;
+          player.y = player.targetY;
         }
+      }
+    }
 
-        // ==========================================================================
-        // 3. 【核心技術】精準座標轉換函數 (Screen to Virtual Coordinate)
-        // ==========================================================================
-        /**
-         * 將瀏覽器事件（Pointer/Touch/Mouse）的 Client 座標轉換為 1024x768 虛擬座標
-         * @param {number} clientX - 點擊點的螢幕 X 座標
-         * @param {number} clientY - 點擊點的螢幕 Y 座標
-         * @returns {{x: number, y: number}} - 轉換後的 1024x768 虛擬座標
-         */
-        function getVirtualCoordinates(clientX, clientY) {
-            // 1. 扣除 Canvas 畫布相對於 Viewport 的偏移量 (Offset)
-            const canvasTouchX = clientX - offsetX;
-            const canvasTouchY = clientY - offsetY;
+    // --- 6. 畫面渲染繪製 ---
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-            // 2. 除以當前縮放比例 (Scale)，換算回原生的 1024x768 空間
-            const virtualX = canvasTouchX / scale;
-            const virtualY = canvasTouchY / scale;
+      if (loadedCount === sources.length) {
+        const currentImg = images[player.frame];
+        
+        // 繪製角色（以角色中心為基準）
+        const drawX = player.x - (player.size / 2);
+        const drawY = player.y - (player.size / 2);
+        
+        ctx.drawImage(currentImg, drawX, drawY, player.size, player.size);
 
-            // 3. 四捨五入並限定邊界在 (0,0) 到 (1024, 768) 之間
-            return {
-                x: Math.min(Math.max(Math.round(virtualX), 0), VIRTUAL_WIDTH),
-                y: Math.min(Math.max(Math.round(virtualY), 0), VIRTUAL_HEIGHT)
-            };
+        // 揮劍攻擊時顯示攻擊判定圈（紅色半透明）
+        if (player.isAttacking && player.frame === 1) {
+          ctx.beginPath();
+          // 繪製縮小後的攻擊圈
+          ctx.arc(player.x + player.hitboxOffsetX, player.y + player.hitboxOffsetY, player.hitboxRadius, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(255, 64, 129, 0.4)';
+          ctx.fill();
         }
+      }
+    }
 
-        // ==========================================================================
-        // 4. 事件監聽 (Event Listeners)
-        // ==========================================================================
-        // 統一使用 Pointer Events 兼顧 Touch 與 Mouse
-        canvas.addEventListener('pointerdown', (e) => {
-            e.preventDefault();
-            
-            // 取得轉換後的虛擬座標
-            const pos = getVirtualCoordinates(e.clientX, e.clientY);
-            
-            // 記錄點擊位置
-            touchPoints.push(pos);
-            
-            // 限制最多儲存 10 個點，防止畫面過於雜亂
-            if (touchPoints.length > 10) {
-                touchPoints.shift();
-            }
+    // --- 7. 揮劍動作控制 ---
+    function playSlash() {
+      if (player.isAttacking) return;
+      player.isAttacking = true;
 
-            render();
-        });
+      const frameSpeed = 90;
 
-        // 視窗大小改變或旋轉螢幕時觸發適應
-        window.addEventListener('resize', resizeCanvas);
-        window.addEventListener('orientationchange', resizeCanvas);
+      player.frame = 0; 
+      setTimeout(() => {
+        player.frame = 1; 
+        
+        setTimeout(() => {
+          player.frame = 2; 
+          
+          setTimeout(() => {
+            player.frame = 0; 
+            player.isAttacking = false;
+          }, frameSpeed);
+        }, frameSpeed);
+      }, frameSpeed);
+    }
 
-        // ==========================================================================
-        // 5. 畫面繪製 logic (Render Engine)
-        // ==========================================================================
-        function render() {
-            // 1. 清空畫布（使用淡米色背景）
-            ctx.fillStyle = '#FDF6E3';
-            ctx.fillRect(0, 0, VIRTUAL_WIDTH, VIRTUAL_HEIGHT);
+    // --- 8. 觸控與點擊定位計算 ---
+    canvas.addEventListener('pointerdown', (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
 
-            // 2. 繪製中央標題與指示文字
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+      // 取得玩家實際點擊的 Canvas 內部座標
+      const clickX = (e.clientX - rect.left) * scaleX;
+      const clickY = (e.clientY - rect.top) * scaleY;
 
-            // 主標題：粢涵的遊戲基地 (測試環境)
-            ctx.font = 'bold 42px sans-serif';
-            ctx.fillStyle = '#4A3E3D'; // 溫馨深棕色
-            ctx.fillText('粢涵的遊戲基地 (測試環境)', VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 - 20);
+      // 修改 3: 目標 X/Y 需扣除攻擊圈的偏移量
+      // 這樣人物走位停下時，攻擊圈的中心點才會剛好落在滑鼠/手指點擊的位置
+      player.targetX = clickX - player.hitboxOffsetX;
+      player.targetY = clickY - player.hitboxOffsetY;
+    });
 
-            // 說明文字
-            ctx.font = '20px sans-serif';
-            ctx.fillStyle = '#8C7B70';
-            ctx.fillText('點擊畫面上任意位置測試觸控座標轉換', VIRTUAL_WIDTH / 2, VIRTUAL_HEIGHT / 2 + 30);
-
-            // 3. 繪製玩家點擊的測試點與座標數據
-            touchPoints.forEach((pt, index) => {
-                const isLatest = index === touchPoints.length - 1;
-
-                // A. 繪製紅色圓點（最新點擊的點較大且有高亮效果）
-                ctx.beginPath();
-                ctx.arc(pt.x, pt.y, isLatest ? 12 : 8, 0, Math.PI * 2);
-                ctx.fillStyle = isLatest ? '#E74C3C' : 'rgba(231, 76, 60, 0.5)';
-                ctx.fill();
-                ctx.lineWidth = 2;
-                ctx.strokeStyle = '#FFFFFF';
-                ctx.stroke();
-
-                // B. 繪製座標數值標籤
-                const text = `(${pt.x}, ${pt.y})`;
-                ctx.font = isLatest ? 'bold 18px monospace' : '14px monospace';
-                ctx.fillStyle = isLatest ? '#2C3E50' : '#7F8C8D';
-                
-                // 聰明的標籤偏移：防止文字超出虛擬畫布頂部
-                const textY = pt.y - 18 < 20 ? pt.y + 25 : pt.y - 18;
-                ctx.fillText(text, pt.x, textY);
-            });
-        }
-
-        // ==========================================================================
-        // 6. 初始化啟動 (Initialization)
-        // ==========================================================================
-        window.addEventListener('DOMContentLoaded', () => {
-            resizeCanvas(); // 初始計算畫布大小並執行首次繪製
-        });
-    </script>
+    // 綁定右下角揮劍按鈕
+    attackBtn.addEventListener('pointerdown', (e) => {
+      e.stopPropagation(); 
+      playSlash();
+    });
+  </script>
 </body>
 </html>
