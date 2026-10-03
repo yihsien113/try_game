@@ -1,7 +1,7 @@
 {
   "name": "詹粢涵娃娃屋尋寶",
   "short_name": "娃娃屋",
-  "start_url": "./map1.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",

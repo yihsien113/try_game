@@ -1,8 +1,8 @@
 const CACHE_NAME = 'dollhouse-game-v1';
 
-// 填寫與 map1.html 同目錄下的檔案檔名
+// 填寫與 index.html 同目錄下的檔案檔名
 const ASSETS_TO_CACHE = [
-  'map1.html',
+  'index.html',
   'manifest.json',
   'map1_s.webp',
   'han1-1.webp',
