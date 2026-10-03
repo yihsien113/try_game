@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>芝涵尋寶冒險</title>
+  <title>張芝涵娃娃屋尋寶</title>
   <style>
     * {
       box-sizing: border-box;
@@ -14,7 +14,7 @@
     body {
       margin: 0;
       padding: 0;
-      background-color: #121212;
+      background-color: #000;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -23,26 +23,50 @@
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       overflow: hidden;
     }
+
+    /* 載入中提示畫面 */
+    #loading-screen {
+      position: absolute;
+      top: 0; left: 0; width: 100vw; height: 100vh;
+      background-color: #121212;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      z-index: 999;
+    }
+    .spinner {
+      margin-bottom: 20px;
+      width: 40px; height: 40px;
+      border: 4px solid rgba(255,255,255,0.2);
+      border-top: 4px solid #ff4081;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
     #game-container {
       position: relative;
-      width: 92vw;               
-      max-width: 1024px;         
-      max-height: 80vh;          
-      
-      background-image: url('bg_photo.jpg'); 
-      background-size: 100% 100%;
-      background-position: center;
-      background-repeat: no-repeat;
+      /* 讓容器在手機/平板畫面上最大化，但維持照片原比例 */
+      width: 95vw;
+      max-width: 100%;
+      max-height: 85vh;
       
       border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
       overflow: hidden;
+      display: none; /* 載入完成前先隱藏 */
+      background-color: #000;
     }
+
     canvas {
       width: 100%;
       height: 100%;
       display: block;
     }
+
     .ui-layer {
       position: absolute;
       bottom: 20px;
@@ -50,14 +74,14 @@
       z-index: 10;
     }
     .btn-attack {
-      width: 80px;
-      height: 80px;
-      font-size: 32px;
+      width: 75px;
+      height: 75px;
+      font-size: 30px;
       color: #fff;
       background: linear-gradient(135deg, #ff4081, #ff80ab);
-      border: 3px solid rgba(255, 255, 255, 0.8);
+      border: 3px solid rgba(255, 255, 255, 0.9);
       border-radius: 50%;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
       cursor: pointer;
       display: flex;
       justify-content: center;
@@ -70,13 +94,13 @@
     }
     .instruction {
       position: absolute;
-      top: 16px;
-      left: 16px;
+      top: 12px;
+      left: 12px;
       color: #fff;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 6px 14px;
+      background: rgba(0, 0, 0, 0.6);
+      padding: 6px 12px;
       border-radius: 20px;
-      font-size: 14px;
+      font-size: 13px;
       pointer-events: none;
       backdrop-filter: blur(4px);
     }
@@ -84,8 +108,14 @@
 </head>
 <body>
 
+  <!-- Loading 介面 -->
+  <div id="loading-screen">
+    <div class="spinner"></div>
+    <div id="loading-text">娃娃屋載入中 (0/4)...</div>
+  </div>
+
   <div id="game-container">
-    <div class="instruction">👆 點擊畫面移動，讓「劍氣範圍」對準目標</div>
+    <div class="instruction">👆 點擊娃娃屋移動，按右下角揮劍</div>
     <canvas id="gameCanvas"></canvas>
     
     <div class="ui-layer">
@@ -94,64 +124,77 @@
   </div>
 
   <script>
+    const loadingScreen = document.getElementById('loading-screen');
+    const loadingText = document.getElementById('loading-text');
     const container = document.getElementById('game-container');
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
     const attackBtn = document.getElementById('attackBtn');
 
-    // --- 1. 角色屬性與設定 ---
+    // 角色設定：可依娃娃屋格子比例調整大小
     const player = {
-      x: 0,
-      y: 0,
-      size: 400,          // 修改 1: 尺寸放大至 400
-      speed: 15,          // 修改 1: 移動速度提升至 15
-      targetX: 0,
-      targetY: 0,
-      frame: 0,
-      isAttacking: false,
-      
-      // 攻擊範圍參數 (相對於人物中心點)
-      hitboxOffsetX: 200, // 攻擊圈在人物偏右方 200px 處
-      hitboxOffsetY: 0,
-      hitboxRadius: 80    // 修改 2: 半徑縮小 50% (原比例對應為 160，現改為 80)
+      x: 0, y: 0,
+      size: 300,          // 人物尺寸
+      speed: 15,          // 移動速度
+      targetX: 0, targetY: 0,
+      frame: 0, isAttacking: false,
+      hitboxOffsetX: 80,  // 攻擊中心偏移量
+      hitboxOffsetY: 0, 
+      hitboxRadius: 60    // 攻擊範圍半徑
     };
 
-    // --- 2. 自動讀取底圖 PNG 比例 ---
+    let totalAssets = 4;
+    let loadedAssets = 0;
+
+    function checkLoadProgress() {
+      loadedAssets++;
+      loadingText.innerText = `娃娃屋載入中 (${loadedAssets}/${totalAssets})...`;
+      
+      if (loadedAssets === totalAssets) {
+        loadingScreen.style.display = 'none';
+        container.style.display = 'block';
+        gameLoop();
+      }
+    }
+
+    // --- 1. 載入壓縮後的背景圖 ---
     const bgImg = new Image();
-    bgImg.src = 'bg_photo.jpg';
+    bgImg.src = 'bg_photo_compressed.jpg'; // 使用壓縮後的圖檔
     bgImg.onload = () => {
+      // 將 Canvas 解析度完全設為圖片真實解析度 (保證不失真)
       canvas.width = bgImg.width;
       canvas.height = bgImg.height;
+
+      // 強制容器長寬比例與背景照片 100% 一致 (解決在手機上拉長變形問題)
       container.style.aspectRatio = `${bgImg.width} / ${bgImg.height}`;
 
+      // 預設人物在照片正中央
       player.x = canvas.width / 2;
       player.y = canvas.height / 2;
       player.targetX = player.x;
       player.targetY = player.y;
 
-      gameLoop();
+      checkLoadProgress();
     };
 
-    // --- 3. 載入去背角色動作圖片 ---
+    // --- 2. 載入去背角色圖片 ---
     const sources = ['frame1_nobg.png', 'frame2_nobg.png', 'frame3_nobg.png'];
     const images = [];
-    let loadedCount = 0;
 
     sources.forEach((src, idx) => {
       const img = new Image();
       img.src = src;
-      img.onload = () => loadedCount++;
+      img.onload = () => checkLoadProgress();
       images[idx] = img;
     });
 
-    // --- 4. 遊戲主迴圈 (Game Loop) ---
+    // --- 3. 遊戲主迴圈 ---
     function gameLoop() {
       update();
       draw();
       requestAnimationFrame(gameLoop);
     }
 
-    // --- 5. 移動邏輯更新 ---
     function update() {
       if (!player.isAttacking) {
         let dx = player.targetX - player.x;
@@ -168,44 +211,35 @@
       }
     }
 
-    // --- 6. 畫面渲染繪製 ---
     function draw() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      // 在 Canvas 上直接繪製背景底圖 (效能與相容性最好)
+      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
 
-      if (loadedCount === sources.length) {
-        const currentImg = images[player.frame];
-        
-        // 繪製角色（以角色中心為基準）
-        const drawX = player.x - (player.size / 2);
-        const drawY = player.y - (player.size / 2);
-        
-        ctx.drawImage(currentImg, drawX, drawY, player.size, player.size);
+      // 繪製角色
+      const currentImg = images[player.frame];
+      const drawX = player.x - (player.size / 2);
+      const drawY = player.y - (player.size / 2);
+      ctx.drawImage(currentImg, drawX, drawY, player.size, player.size);
 
-        // 揮劍攻擊時顯示攻擊判定圈（紅色半透明）
-        if (player.isAttacking && player.frame === 1) {
-          ctx.beginPath();
-          // 繪製縮小後的攻擊圈
-          ctx.arc(player.x + player.hitboxOffsetX, player.y + player.hitboxOffsetY, player.hitboxRadius, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 64, 129, 0.4)';
-          ctx.fill();
-        }
+      // 揮劍範圍顯示
+      if (player.isAttacking && player.frame === 1) {
+        ctx.beginPath();
+        ctx.arc(player.x + player.hitboxOffsetX, player.y + player.hitboxOffsetY, player.hitboxRadius, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(255, 64, 129, 0.4)';
+        ctx.fill();
       }
     }
 
-    // --- 7. 揮劍動作控制 ---
     function playSlash() {
       if (player.isAttacking) return;
       player.isAttacking = true;
-
       const frameSpeed = 90;
 
       player.frame = 0; 
       setTimeout(() => {
         player.frame = 1; 
-        
         setTimeout(() => {
           player.frame = 2; 
-          
           setTimeout(() => {
             player.frame = 0; 
             player.isAttacking = false;
@@ -214,23 +248,18 @@
       }, frameSpeed);
     }
 
-    // --- 8. 觸控與點擊定位計算 ---
     canvas.addEventListener('pointerdown', (e) => {
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
       const scaleY = canvas.height / rect.height;
-
-      // 取得玩家實際點擊的 Canvas 內部座標
       const clickX = (e.clientX - rect.left) * scaleX;
       const clickY = (e.clientY - rect.top) * scaleY;
 
-      // 修改 3: 目標 X/Y 需扣除攻擊圈的偏移量
-      // 這樣人物走位停下時，攻擊圈的中心點才會剛好落在滑鼠/手指點擊的位置
+      // 點擊移動時，攻擊圈中心點精確對準點擊位置
       player.targetX = clickX - player.hitboxOffsetX;
       player.targetY = clickY - player.hitboxOffsetY;
     });
 
-    // 綁定右下角揮劍按鈕
     attackBtn.addEventListener('pointerdown', (e) => {
       e.stopPropagation(); 
       playSlash();
