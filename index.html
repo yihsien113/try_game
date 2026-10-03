@@ -4,6 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>詹粢涵娃娃屋尋寶</title>
+  
+  <!-- 引入 PWA 清單 -->
+  <link rel="manifest" href="manifest.json">
+  
   <style>
     * {
       box-sizing: border-box;
@@ -152,6 +156,15 @@
   </div>
 
   <script>
+    // 註冊 PWA Service Worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('PWA Service Worker 註冊成功！'))
+          .catch(err => console.log('PWA 註冊失敗:', err));
+      });
+    }
+
     const loadingScreen = document.getElementById('loading-screen');
     const loadingText = document.getElementById('loading-text');
     const container = document.getElementById('game-container');
@@ -188,15 +201,15 @@
     };
 
     const spawnZones = [
-  // 整個房屋
-  [
-    { x: 443, y: 117 },
-    { x: 99, y: 405 },
-    { x: 102, y: 1103 },
-    { x: 818, y: 1106 },
-    { x: 821, y: 332 },
-  ]
-];
+      // 整個房屋
+      [
+        { x: 443, y: 117 },
+        { x: 99, y: 405 },
+        { x: 102, y: 1103 },
+        { x: 818, y: 1106 },
+        { x: 821, y: 332 },
+      ]
+    ];
 
     function spawnMonster() {
       const zonePoints = spawnZones[Math.floor(Math.random() * spawnZones.length)];
@@ -251,7 +264,7 @@
     }
 
     const bgImg = new Image();
-    bgImg.src = 'map1_s.jpg'; 
+    bgImg.src = 'map1_s.webp'; 
     bgImg.onload = () => {
       canvas.width = bgImg.width;
       canvas.height = bgImg.height;
@@ -265,7 +278,7 @@
       checkLoadProgress();
     };
 
-    const playerSources = ['han1-1.png', 'han1-2.png', 'han1-3.png'];
+    const playerSources = ['han1-1.webp', 'han1-2.webp', 'han1-3.webp'];
     const playerImages = [];
     playerSources.forEach((src, idx) => {
       const img = new Image();
@@ -274,7 +287,7 @@
       playerImages[idx] = img;
     });
 
-    const monsterSources = ['bad1-1.png', 'bad1-2.png', 'bad1-3.png'];
+    const monsterSources = ['bad1-1.webp', 'bad1-2.webp', 'bad1-3.webp'];
     const monsterImages = [];
     monsterSources.forEach((src, idx) => {
       const img = new Image();
@@ -336,7 +349,6 @@
         }
       }
       
-      // 注意：這裡必須改用 innerHTML
       document.getElementById('star-container').innerHTML = killsHtml;
       
       document.getElementById('result-screen').style.display = 'flex';
