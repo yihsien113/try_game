@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>張芝涵娃娃屋尋寶</title>
+  <title>詹粢涵娃娃屋尋寶</title>
   <style>
     * {
       box-sizing: border-box;
@@ -64,17 +64,62 @@
       display: block;
     }
 
-    .instruction {
+    
+
+    /* === UI 疊加層樣式 === */
+    .overlay {
       position: absolute;
-      top: 12px;
-      left: 12px;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background-color: rgba(0, 0, 0, 0.85);
       color: #fff;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 13px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    
+    .btn {
+      margin-top: 20px;
+      padding: 12px 30px;
+      font-size: 20px;
+      font-weight: bold;
+      color: #fff;
+      background-color: #ff4081;
+      border: none;
+      border-radius: 30px;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(255, 64, 129, 0.4);
+      transition: transform 0.1s;
+    }
+    
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    #hud {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      color: #fff;
+      font-size: 20px;
+      font-weight: bold;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px 16px;
+      border-radius: 15px;
       pointer-events: none;
+      z-index: 100;
+      display: none;
       backdrop-filter: blur(4px);
+    }
+
+    #star-container {
+      font-size: 35px;
+      margin-top: 15px;
+      max-width: 80%;
+      text-align: center;
+      line-height: 1.5;
+      text-shadow: 0 0 10px rgba(255,215,0,0.8);
     }
   </style>
 </head>
@@ -82,11 +127,30 @@
 
   <div id="loading-screen">
     <div class="spinner"></div>
-    <div id="loading-text">娃娃屋載入中 (0/4)...</div>
+    <div id="loading-text">娃娃屋載入中 (0/7)...</div>
   </div>
 
   <div id="game-container">
-    <div class="instruction">👆 點擊目標物品，到達後會自動揮刀攻擊！</div>
+    
+    
+    <!-- 計分板 -->
+    <div id="hud">⏳ <span id="timerDisplay">20</span> | 💯 <span id="scoreDisplay">0</span></div>
+    
+    <!-- 開始畫面 -->
+    <div id="start-screen" class="overlay" style="display: none;">
+      <h1 style="font-size: 32px; margin-bottom: 10px;">娃娃屋討伐戰</h1>
+      <p style="font-size: 18px; margin: 0;">20秒內，盡可能消滅最多的裂縫怪物！</p>
+      <button class="btn" onclick="startGame()">開始遊戲</button>
+    </div>
+
+    <!-- 結算畫面 -->
+    <div id="result-screen" class="overlay" style="display: none;">
+      <h1 style="font-size: 36px; color: #ffeb3b; margin: 0;">時間到！</h1>
+      <h2 style="font-size: 28px; margin: 10px 0;">總得分: <span id="finalScore">0</span> 分</h2>
+      <div id="star-container"></div>
+      <button class="btn" onclick="startGame()">再玩一次</button>
+    </div>
+
     <canvas id="gameCanvas"></canvas>
   </div>
 
@@ -97,23 +161,82 @@
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
 
-    // 角色屬性 (依最新要求更新)
+    // === 遊戲狀態變數 ===
+    let score = 0;
+    let timeLeft = 20; // 遊戲時間改為 20 秒
+    let isPlaying = false;
+    let timerId = null;
+
+    // 角色精準屬性設定
     const player = {
       x: 0, y: 0,
-      size: 150,           // 修改 2: 人物 size 改為 150
-      speed: 5,            // 修改 3: 移動速度改為 5
+      size: 250,           
+      speed: 5,            
       targetX: 0, targetY: 0,
       frame: 0, 
       isAttacking: false,
       isFacingLeft: false, 
       isMoving: false,     
       walkCycle: 0,        
-      hitboxOffsetX: 80,   // 依比例調小的攻擊中心偏移量
+      hitboxOffsetX: 120,   
       hitboxOffsetY: 0, 
-      hitboxRadius: 30     // 修改 4: 攻擊範圍改為 30
+      hitboxRadius: 50     
     };
 
-    let totalAssets = 4;
+    // 怪物屬性（包含動畫幀數）
+    const monster = {
+      x: 0, y: 0,
+      size: 250, // 稍微調大一點，讓圖片顯示更清楚           
+      isVisible: false,
+      frame: 0, // 當前動畫幀 (0, 1, 2 對應 monster1, 2, 3)
+      animationInterval: null // 動畫計時器
+    };
+
+    const spawnZones = [
+      [{ x: 117, y: 991 }, { x: 108, y: 950 }, { x: 658, y: 514 }, { x: 1069, y: 684 }, { x: 1066, y: 985 }],
+      [{ x: 1109, y: 985 }, { x: 1107, y: 704 }, { x: 1711, y: 948 }, { x: 1710, y: 986 }],
+      [{ x: 117, y: 1029 }, { x: 1063, y: 1024 }, { x: 1067, y: 1558 }, { x: 130, y: 1562 }],
+      [{ x: 1105, y: 1029 }, { x: 1707, y: 1027 }, { x: 1694, y: 1555 }, { x: 1110, y: 1558 }],
+      [{ x: 128, y: 1607 }, { x: 705, y: 1605 }, { x: 707, y: 2195 }, { x: 157, y: 2199 }],
+      [{ x: 769, y: 1605 }, { x: 1690, y: 1604 }, { x: 1689, y: 2182 }, { x: 762, y: 2198 }]
+    ];
+
+    function spawnMonster() {
+      const zonePoints = spawnZones[Math.floor(Math.random() * spawnZones.length)];
+      const path = new Path2D();
+      path.moveTo(zonePoints[0].x, zonePoints[0].y);
+      for (let i = 1; i < zonePoints.length; i++) {
+        path.lineTo(zonePoints[i].x, zonePoints[i].y);
+      }
+      path.closePath();
+
+      let isInside = false;
+      let rx, ry;
+      while (!isInside) {
+        rx = 100 + Math.random() * (canvas.width - 200);
+        ry = 500 + Math.random() * (canvas.height - 700);
+        if (ctx.isPointInPath(path, rx, ry)) {
+          isInside = true;
+        }
+      }
+
+      monster.x = rx;
+      monster.y = ry;
+      monster.isVisible = true;
+      monster.frame = 0; // 重置怪物動畫幀
+
+      // 啟動怪物出現的動畫
+      if (monster.animationInterval) clearInterval(monster.animationInterval);
+      monster.animationInterval = setInterval(() => {
+        if (monster.frame < 2) {
+          monster.frame++;
+        } else {
+          clearInterval(monster.animationInterval); // 動畫播完最後一幀就停止
+        }
+      }, 150); // 每 150 毫秒切換一幀
+    }
+
+    let totalAssets = 7; // 背景 + 3張主角 + 3張怪物
     let loadedAssets = 0;
 
     function checkLoadProgress() {
@@ -123,12 +246,14 @@
       if (loadedAssets === totalAssets) {
         loadingScreen.style.display = 'none';
         container.style.display = 'block';
+        
+        document.getElementById('start-screen').style.display = 'flex';
         gameLoop();
       }
     }
 
     const bgImg = new Image();
-    bgImg.src = 'bg_photo_compressed.jpg';
+    bgImg.src = 'bg_photo_compressed_2.jpg'; 
     bgImg.onload = () => {
       canvas.width = bgImg.width;
       canvas.height = bgImg.height;
@@ -142,15 +267,82 @@
       checkLoadProgress();
     };
 
-    const sources = ['frame1_nobg.png', 'frame2_nobg.png', 'frame3_nobg.png'];
-    const images = [];
-
-    sources.forEach((src, idx) => {
+    // 載入主角圖片
+    const playerSources = ['frame1_nobg.png', 'frame2_nobg.png', 'frame3_nobg.png'];
+    const playerImages = [];
+    playerSources.forEach((src, idx) => {
       const img = new Image();
       img.src = src;
       img.onload = () => checkLoadProgress();
-      images[idx] = img;
+      playerImages[idx] = img;
     });
+
+    // 載入怪物圖片
+    const monsterSources = ['monster1.png', 'monster2.png', 'monster3.png'];
+    const monsterImages = [];
+    monsterSources.forEach((src, idx) => {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => checkLoadProgress();
+      monsterImages[idx] = img;
+    });
+
+    // === 開始遊戲邏輯 ===
+    function startGame() {
+      score = 0;
+      timeLeft = 20; // 遊戲時間 20 秒
+      isPlaying = true;
+      
+      document.getElementById('scoreDisplay').innerText = score;
+      document.getElementById('timerDisplay').innerText = timeLeft;
+      document.getElementById('start-screen').style.display = 'none';
+      document.getElementById('result-screen').style.display = 'none';
+      document.getElementById('hud').style.display = 'block';
+      
+      player.x = canvas.width / 2;
+      player.y = canvas.height / 2;
+      player.targetX = player.x;
+      player.targetY = player.y;
+      player.isMoving = false;
+      player.isAttacking = false;
+      player.frame = 0;
+      
+      spawnMonster();
+      
+      if (timerId) clearInterval(timerId);
+      timerId = setInterval(() => {
+        timeLeft--;
+        document.getElementById('timerDisplay').innerText = timeLeft;
+        
+        if (timeLeft <= 0) {
+          endGame();
+        }
+      }, 1000);
+    }
+
+    // === 結束遊戲邏輯 ===
+    function endGame() {
+      isPlaying = false;
+      clearInterval(timerId);
+      if (monster.animationInterval) clearInterval(monster.animationInterval);
+      
+      monster.isVisible = false;
+      player.isMoving = false;
+      player.targetX = player.x;
+      player.targetY = player.y;
+      
+      document.getElementById('hud').style.display = 'none';
+      document.getElementById('finalScore').innerText = score;
+      
+      // 結算畫面用 💀 來代表擊殺的怪物數（也可以改回星星 ⭐）
+      let killsHtml = '';
+      for (let i = 0; i < score; i++) {
+        killsHtml += '⭐';
+      }
+      document.getElementById('star-container').innerText = killsHtml;
+      
+      document.getElementById('result-screen').style.display = 'flex';
+    }
 
     function gameLoop() {
       update();
@@ -164,25 +356,18 @@
         let dy = player.targetY - player.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
 
-        // 自動轉向判定
-        if (Math.abs(dx) > 2) {
-          player.isFacingLeft = dx < 0;
-        }
-
         if (distance > player.speed) {
           player.x += (dx / distance) * player.speed;
           player.y += (dy / distance) * player.speed;
           player.isMoving = true;
           player.walkCycle += 0.25; 
         } else {
-          // 到達目的地時
           if (player.isMoving) {
             player.x = player.targetX;
             player.y = player.targetY;
             player.isMoving = false;
             player.walkCycle = 0;
             
-            // 修改 1: 到達目的地後自動揮刀攻擊！
             playSlash();
           }
         }
@@ -195,9 +380,34 @@
     function draw() {
       ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
 
+      // 繪製怪物
+      if (monster.isVisible) {
+        // 【修正】：將這行刪除或註解掉
+        // ctx.globalCompositeOperation = 'screen'; 
+        
+        ctx.drawImage(
+          monsterImages[monster.frame], 
+          monster.x - monster.size / 2, 
+          monster.y - monster.size / 2, 
+          monster.size, 
+          monster.size
+        );
+        
+        // 【修正】：將這行刪除或註解掉
+        // ctx.globalCompositeOperation = 'source-over'; 
+      }
+
+      // ... 後面的程式碼保持不變
+
       ctx.save(); 
 
-      // 走路搖晃計算
+      const distToTarget = Math.sqrt(Math.pow(player.targetX - player.x, 2) + Math.pow(player.targetY - player.y, 2));
+      if (player.isMoving && distToTarget < 60) {
+        ctx.globalAlpha = 0.45; 
+      } else {
+        ctx.globalAlpha = 1.0;  
+      }
+
       let offsetY = 0;
       let rotationAngle = 0;
 
@@ -209,7 +419,7 @@
       ctx.translate(player.x, player.y + offsetY);
       ctx.rotate(rotationAngle);
 
-      const currentImg = images[player.frame];
+      const currentImg = playerImages[player.frame];
 
       if (player.isFacingLeft) {
         ctx.scale(-1, 1);
@@ -244,6 +454,23 @@
       player.frame = 0; 
       setTimeout(() => {
         player.frame = 1; 
+        
+        const currentOffsetX = player.isFacingLeft ? -player.hitboxOffsetX : player.hitboxOffsetX;
+        const attackCenterX = player.x + currentOffsetX;
+        const attackCenterY = player.y + player.hitboxOffsetY;
+        
+        const distToMonster = Math.sqrt(Math.pow(attackCenterX - monster.x, 2) + Math.pow(attackCenterY - monster.y, 2));
+        
+        if (monster.isVisible && distToMonster <= (player.hitboxRadius + monster.size / 2)) {
+          monster.isVisible = false;
+          
+          if (isPlaying) {
+            score++;
+            document.getElementById('scoreDisplay').innerText = score;
+            spawnMonster(); 
+          }
+        }
+
         setTimeout(() => {
           player.frame = 2; 
           setTimeout(() => {
@@ -254,10 +481,8 @@
       }, frameSpeed);
     }
 
-    // 點擊事件：指定目標點後走過去
     canvas.addEventListener('pointerdown', (e) => {
-      // 攻擊中不受理新的點擊，避免重複觸發
-      if (player.isAttacking) return;
+      if (!isPlaying || player.isAttacking) return;
 
       const rect = canvas.getBoundingClientRect();
       const scaleX = canvas.width / rect.width;
@@ -265,12 +490,22 @@
       const clickX = (e.clientX - rect.left) * scaleX;
       const clickY = (e.clientY - rect.top) * scaleY;
 
-      // 判斷移動方向以正確對齊劍氣中心點
-      const isWillFaceLeft = (clickX - player.x) < 0;
-      const currentOffsetX = isWillFaceLeft ? -player.hitboxOffsetX : player.hitboxOffsetX;
+      player.isFacingLeft = clickX < player.x;
 
-      player.targetX = clickX - currentOffsetX;
+      if (player.isFacingLeft) {
+        player.targetX = clickX + player.hitboxOffsetX;
+      } else {
+        player.targetX = clickX - player.hitboxOffsetX;
+      }
       player.targetY = clickY - player.hitboxOffsetY;
+
+      const distToTarget = Math.sqrt(Math.pow(player.targetX - player.x, 2) + Math.pow(player.targetY - player.y, 2));
+      
+      if (distToTarget <= player.speed) {
+        playSlash();
+      } else {
+        player.isMoving = true;
+      }
     });
   </script>
 </body>
