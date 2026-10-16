@@ -11,6 +11,7 @@ const GAME_ASSETS = [
   'map5.html',
   'map6.html',
   'map7.html',
+  'bopomofo.js',
   'manifest.json',
   'assets/icon.webp',
   'assets/lobby/lobby.webp',
