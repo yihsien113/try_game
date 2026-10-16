@@ -1,57 +1,34 @@
-const CACHE_NAME = 'dollhouse-game-v1';
+// 引用素材清單
+importScripts('./assets-manifest.js');
 
-// 填寫與 index.html 同目錄下的檔案檔名
-const ASSETS_TO_CACHE = [
-  'index.html',
-  'manifest.json',
-  'map1_s.webp',
-  'han1-1.webp',
-  'han1-2.webp',
-  'han1-3.webp',
-  'bad1-1.webp',
-  'bad1-2.webp',
-  'bad1-3.webp'
-];
-
-// 安裝並預載
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE_NAME).then(async (cache) => {
-      console.log('[PWA] 開始預載檔案...');
-      // 逐一加進快取，若有檔案找不到會在 Console 印出詳細錯在哪個檔
-      for (const asset of ASSETS_TO_CACHE) {
-        try {
-          await cache.add(asset);
-          console.log(`[PWA] 成功預載: ${asset}`);
-        } catch (err) {
-          console.error(`❌ [PWA] 預載失敗，請檢查此檔案是否存在或檔名大小寫: ${asset}`, err);
-        }
-      }
-    }).then(() => self.skipWaiting())
+// 1. 安裝階段：快取所有資源並立刻接管
+self.addEventListener('install', (event) => {
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(GAME_ASSETS))
   );
+  self.skipWaiting(); // 強制跳過等待，立刻啟用新版
 });
 
-// 啟動與清理舊快取
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
+// 2. 啟用階段：清除「舊版本」快取（非常重要！）
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
     caches.keys().then((keys) => {
       return Promise.all(
         keys.map((key) => {
-          if (key !== CACHE_NAME) return caches.delete(key);
+          // 如果快取名稱不是當前的 CACHE_NAME 就刪除
+          if (key !== CACHE_NAME) {
+            return caches.delete(key);
+          }
         })
       );
-    }).then(() => self.clients.claim())
+    })
   );
+  self.clients.claim(); // 讓新版 Service Worker 立即控制現有頁面
 });
 
-// 攔截請求
-self.addEventListener('fetch', (e) => {
-  e.respondWith(
-    caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(e.request);
-    })
+// 3. 攔截請求：優先讀取快取，沒有才走網路
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    caches.match(event.request).then((res) => res || fetch(event.request))
   );
 });

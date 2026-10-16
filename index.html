@@ -1,499 +1,469 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>詹粢涵娃娃屋尋寶</title>
-  
-  <!-- 引入 PWA 清單 -->
+<head> 
+  <link rel="apple-touch-icon" href="assets/icon.png">
   <link rel="manifest" href="manifest.json">
-  
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>粢涵尋寶去 - 大廳</title>
   <style>
-    * {
-      box-sizing: border-box;
-      -webkit-user-select: none;
-      user-select: none;
-      touch-action: none; 
-    }
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-      overflow: hidden;
-    }
-
-    #loading-screen {
-      position: absolute;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background-color: #121212;
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      z-index: 999;
-    }
-    .spinner {
-      margin-bottom: 20px;
-      width: 40px; height: 40px;
-      border: 4px solid rgba(255,255,255,0.2);
-      border-top: 4px solid #ff4081;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    #game-container {
-      position: relative;
-      width: 95vw;
-      max-width: 100%;
-      max-height: 85vh;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
-      overflow: hidden;
-      display: none; 
-      background-color: #000;
-    }
-
-    canvas {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .overlay {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background-color: rgba(0, 0, 0, 0.85);
-      color: #fff;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 1000;
-    }
+    * { box-sizing: border-box; user-select: none; touch-action: none; }
+    body { margin: 0; overflow: hidden; background-color: #000; }
+    canvas { display: block; width: 100vw; height: 100vh; }
     
-    .btn {
-      margin-top: 20px;
-      padding: 12px 30px;
-      font-size: 20px;
-      font-weight: bold;
-      color: #fff;
-      background-color: #ff4081;
-      border: none;
-      border-radius: 30px;
-      cursor: pointer;
-      box-shadow: 0 4px 15px rgba(255, 64, 129, 0.4);
-      transition: transform 0.1s;
-    }
-    
-    .btn:active {
-      transform: scale(0.95);
-    }
-
     #hud {
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      color: #fff;
-      font-size: 20px;
-      font-weight: bold;
-      background: rgba(0, 0, 0, 0.5);
-      padding: 8px 16px;
-      border-radius: 15px;
-      pointer-events: none;
-      z-index: 100;
-      display: none;
-      backdrop-filter: blur(4px);
-    }
-
-    /* 調整星星容器：限制每行最多12個（28px * 12），超過自動換行 */
-    #star-container {
-      font-size: 28px;
-      margin-top: 15px;
-      width: 336px; 
-      max-width: 90vw;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      line-height: 1.2;
-      text-shadow: 0 0 10px rgba(255,215,0,0.8);
+      position: absolute; top: 15px; left: 15px;
+      color: #fff; font-size: 24px; font-weight: bold;
+      background: rgba(0, 0, 0, 0.6); padding: 10px 20px;
+      border-radius: 20px; z-index: 100;
     }
   </style>
 </head>
 <body>
-
-  <div id="loading-screen">
-    <div class="spinner"></div>
-    <div id="loading-text">娃娃屋載入中 (0/7)...</div>
+  <!-- 1. 新增：進度條畫面 -->
+  <div id="preloader" style="position:fixed;inset:0;background:#1a1a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif;color:#fff;">
+    <div style="font-size:22px;margin-bottom:20px;font-weight:bold;">遊戲素材載入中...</div>
+    <div style="width:280px;height:18px;background:#333;border-radius:9px;overflow:hidden;border:2px solid #555;">
+      <div id="progress-bar" style="width:0%;height:100%;background:#4caf50;transition:width 0.1s ease;"></div>
+    </div>
+    <div id="progress-text" style="margin-top:12px;font-size:16px;color:#bbb;">0%</div>
   </div>
 
-  <div id="game-container">
-    <div id="hud">⏳ <span id="timerDisplay">20</span> | ⭐ <span id="scoreDisplay">0</span></div>
-    
-    <div id="start-screen" class="overlay" style="display: none;">
-      <h1 style="font-size: 32px; margin-bottom: 10px;">娃娃屋討伐戰</h1>
-      <p style="font-size: 18px; margin: 0;">20秒內，盡可能消滅最多的裂縫怪物！</p>
-      <button class="btn" onclick="startGame()">開始遊戲</button>
-    </div>
+  <div id="hud"> <span id="coinDisplay">0</span> ⭐</div>
+  <canvas id="lobbyCanvas"></canvas>
 
-    <div id="result-screen" class="overlay" style="display: none;">
-      <button class="btn" style="position: absolute; top: 20px; left: 20px; margin-top: 0; padding: 10px 20px; font-size: 18px;" onclick="window.location.href='index.html'">🔙 返回大廳</button>
-      <h1 style="font-size: 36px; color: #ffeb3b; margin: 0;">時間到！</h1>
-      <h2 style="font-size: 28px; margin: 10px 0;">總得分: <span id="finalScore">0</span> 分</h2>
-      <div id="star-container"></div>
-      <button class="btn" onclick="startGame()">再玩一次</button>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
-  </div>
-
+  <!-- 2. 新增：引入清單並執行預載與 SW 註冊 -->
+  <script src="assets-manifest.js"></script>
   <script>
-    // 註冊 PWA Service Worker
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-          .then(reg => console.log('PWA Service Worker 註冊成功！'))
-          .catch(err => console.log('PWA 註冊失敗:', err));
-      });
+      navigator.serviceWorker.register('sw.js')
+        .then(() => console.log('Service Worker 註冊成功'))
+        .catch((err) => console.warn('Service Worker 註冊失敗:', err));
     }
 
-    const loadingScreen = document.getElementById('loading-screen');
-    const loadingText = document.getElementById('loading-text');
-    const container = document.getElementById('game-container');
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
+    async function runPreloader() {
+      const bar = document.getElementById('progress-bar');
+      const text = document.getElementById('progress-text');
+      const preloader = document.getElementById('preloader');
 
-    let score = 0;
-    let timeLeft = 20;
-    let isPlaying = false;
-    let timerId = null;
-    let lastTime = 0; 
+      const cacheName = typeof CACHE_NAME !== 'undefined' ? CACHE_NAME : GAME_CACHE_NAME;
+      const cache = await caches.open(cacheName);
+      
+      let loadedCount = 0;
+      const total = GAME_ASSETS.length;
+
+      await Promise.all(GAME_ASSETS.map(async (url) => {
+        try {
+          const match = await cache.match(url);
+          if (!match) {
+            const res = await fetch(url);
+            if (res.ok) await cache.put(url, res);
+          }
+        } catch (err) {
+          console.warn('預載失敗:', url);
+        } finally {
+          loadedCount++;
+          const percent = Math.round((loadedCount / total) * 100);
+          if (bar) bar.style.width = percent + '%';
+          if (text) text.innerText = percent + '%';
+        }
+      }));
+
+      setTimeout(() => {
+        if (preloader) {
+          preloader.style.transition = 'opacity 0.5s ease';
+          preloader.style.opacity = '0';
+          setTimeout(() => preloader.remove(), 500);
+        }
+      }, 200);
+    }
+
+    window.addEventListener('DOMContentLoaded', runPreloader);
+  </script>
+
+  <!-- 大廳遊戲邏輯 -->
+  <script>
+    const canvas = document.getElementById('lobbyCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    const MAP_WIDTH = 3000;
+    const MAP_HEIGHT = 4000;
+
+    let scale = 1.0;
+    let minScale = 1.0; 
+    let cameraX = 0;
+    let cameraY = 0;
+
+    function clampCamera() {
+      let viewW = canvas.width / scale;
+      let viewH = canvas.height / scale;
+
+      if (viewW > MAP_WIDTH) {
+        cameraX = -(viewW - MAP_WIDTH) / 2;
+      } else {
+        cameraX = Math.max(0, Math.min(cameraX, MAP_WIDTH - viewW));
+      }
+
+      if (viewH > MAP_HEIGHT) {
+        cameraY = -(viewH - MAP_HEIGHT) / 2;
+      } else {
+        cameraY = Math.max(0, Math.min(cameraY, MAP_HEIGHT - viewH));
+      }
+    }
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      
+      minScale = canvas.width / (MAP_WIDTH / 2);
+      
+      if (scale < minScale) {
+        scale = minScale;
+      }
+      clampCamera();
+    }
+    window.addEventListener('resize', resize);
+
+    document.getElementById('coinDisplay').innerText = localStorage.getItem('playerCoins') || '0';
+    let equippedCharKey = localStorage.getItem('equippedCharacter') || 'han1';
+    
+    const bgImg = new Image();
+    bgImg.src = 'assets/lobby/lobby.webp';
+
+    const playerImg = new Image();
+    playerImg.src = `assets/han/${equippedCharKey}-1.webp`;
+
+    // ===== 人物座標載入與儲存邏輯 =====
+    const DEFAULT_PLAYER_X = 943;
+    const DEFAULT_PLAYER_Y = 1051;
+
+    const savedX = localStorage.getItem('lobbyPlayerX');
+    const savedY = localStorage.getItem('lobbyPlayerY');
+
+    const initialX = (savedX !== null && !isNaN(parseFloat(savedX))) ? parseFloat(savedX) : DEFAULT_PLAYER_X;
+    const initialY = (savedY !== null && !isNaN(parseFloat(savedY))) ? parseFloat(savedY) : DEFAULT_PLAYER_Y;
+
+    function savePlayerPosition() {
+      localStorage.setItem('lobbyPlayerX', Math.round(player.x));
+      localStorage.setItem('lobbyPlayerY', Math.round(player.y));
+    }
 
     const player = {
-      x: 0, y: 0,
-      size: 160,           
-      speedPxPerSec: 900,       
-      targetX: 0, targetY: 0,
-      frame: 0, 
-      isAttacking: false,
+      x: initialX, 
+      y: initialY, 
+      size: 160, 
+      speed: 600,
+      targetX: initialX, 
+      targetY: initialY,
+      isMoving: false, 
       isFacingLeft: false, 
-      isMoving: false,     
-      walkCycle: 0,        
-      hitboxOffsetX: 100,   
-      hitboxOffsetY: 0, 
-      hitboxRadius: 30     
+      walkCycle: 0
     };
 
-    const monster = {
-      x: 0, y: 0,
-      size: 120,           
-      isVisible: false,
-      frame: 0,
-      animationInterval: null
-    };
+    // 關閉頁面或跳轉前儲存位置
+    window.addEventListener('pagehide', savePlayerPosition);
+    window.addEventListener('beforeunload', savePlayerPosition);
 
-    const spawnZones = [
-      // 整個房屋
-      [
-        { x: 443, y: 117 },
-        { x: 99, y: 405 },
-        { x: 102, y: 1103 },
-        { x: 818, y: 1106 },
-        { x: 821, y: 332 },
-      ]
+    resize();
+    scale = minScale;
+    cameraX = player.x - (canvas.width / scale) / 2;
+    cameraY = player.y - (canvas.height / scale) / 2;
+    clampCamera();
+
+    const zones = [
+      { id: 'wardrobe', x: 170, y: 195, w: 225, h: 300, color: '#9c27b0', imgSrc: 'assets/wardrobe/wardrobe.webp' },
+      { id: 'map1', x: 1300, y: 1221, w: 225, h: 300, color: '#f44336', imgSrc: 'assets/map/map1.webp' },
+      { id: 'map2', x: 543, y: 1398, w: 225, h: 300, color: '#4caf50', imgSrc: 'assets/map/map2.webp' },
+      { id: 'map3', x: 1639, y: 1890, w: 225, h: 300, color: '#4caf50', imgSrc: 'assets/map/map3.webp' },
+      { id: 'map4', x: 780, y: 2030, w: 225, h: 300, color: '#2196f3', imgSrc: 'assets/map/map4.webp' },
+      { id: 'map5', x: 1800, y: 1500, w: 225, h: 300, color: '#2196f3', imgSrc: 'assets/map/map5.webp' },
+      { id: 'map6', x: 640, y: 1050, w: 225, h: 300, color: '#2196f3', imgSrc: 'assets/map/map6.webp' },
     ];
 
-    function spawnMonster() {
-      const zonePoints = spawnZones[Math.floor(Math.random() * spawnZones.length)];
-      const path = new Path2D();
-      path.moveTo(zonePoints[0].x, zonePoints[0].y);
-      for (let i = 1; i < zonePoints.length; i++) {
-        path.lineTo(zonePoints[i].x, zonePoints[i].y);
-      }
-      path.closePath();
-
-      let isInside = false;
-      let rx, ry;
-
-      while (!isInside) {
-        rx = Math.random() * canvas.width;
-        ry = Math.random() * canvas.height;
-        if (ctx.isPointInPath(path, rx, ry)) {
-          isInside = true;
-        }
-      }
-
-      monster.x = rx;
-      monster.y = ry;
-      monster.isVisible = true;
-      monster.frame = 0;
-
-      if (monster.animationInterval) clearInterval(monster.animationInterval);
-      monster.animationInterval = setInterval(() => {
-        if (monster.frame < 2) {
-          monster.frame++;
-        } else {
-          clearInterval(monster.animationInterval);
-        }
-      }, 150);
+    for (let z of zones) {
+      z.img = new Image();
+      z.img.src = z.imgSrc;
     }
 
-    let totalAssets = 7;
-    let loadedAssets = 0;
-
-    function checkLoadProgress() {
-      loadedAssets++;
-      loadingText.innerText = `娃娃屋載入中 (${loadedAssets}/${totalAssets})...`;
-      
-      if (loadedAssets === totalAssets) {
-        loadingScreen.style.display = 'none';
-        container.style.display = 'block';
-        
-        document.getElementById('start-screen').style.display = 'flex';
-        lastTime = performance.now();
-        requestAnimationFrame(gameLoop);
-      }
-    }
-
-    const bgImg = new Image();
-    bgImg.src = 'map1_s.webp'; 
-    bgImg.onload = () => {
-      canvas.width = bgImg.width;
-      canvas.height = bgImg.height;
-      container.style.aspectRatio = `${bgImg.width} / ${bgImg.height}`;
-
-      player.x = canvas.width / 2;
-      player.y = canvas.height / 2;
-      player.targetX = player.x;
-      player.targetY = player.y;
-
-      checkLoadProgress();
-    };
-
-    const playerSources = ['han1-1.webp', 'han1-2.webp', 'han1-3.webp'];
-    const playerImages = [];
-    playerSources.forEach((src, idx) => {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => checkLoadProgress();
-      playerImages[idx] = img;
-    });
-
-    const monsterSources = ['bad1-1.webp', 'bad1-2.webp', 'bad1-3.webp'];
-    const monsterImages = [];
-    monsterSources.forEach((src, idx) => {
-      const img = new Image();
-      img.src = src;
-      img.onload = () => checkLoadProgress();
-      monsterImages[idx] = img;
-    });
-
-    function startGame() {
-      score = 0;
-      timeLeft = 20;
-      isPlaying = true;
-      
-      document.getElementById('scoreDisplay').innerText = score;
-      document.getElementById('timerDisplay').innerText = timeLeft;
-      document.getElementById('start-screen').style.display = 'none';
-      document.getElementById('result-screen').style.display = 'none';
-      document.getElementById('hud').style.display = 'block';
-      
-      player.x = canvas.width / 2;
-      player.y = canvas.height / 2;
-      player.targetX = player.x;
-      player.targetY = player.y;
-      player.isMoving = false;
-      player.isAttacking = false;
-      player.frame = 0;
-      
-      spawnMonster();
-      
-      if (timerId) clearInterval(timerId);
-      timerId = setInterval(() => {
-        timeLeft--;
-        document.getElementById('timerDisplay').innerText = timeLeft;
-        
-        if (timeLeft <= 0) {
-          endGame();
-        }
-      }, 1000);
-    }
-
-    function endGame() {
-      isPlaying = false;
-      clearInterval(timerId);
-      if (monster.animationInterval) clearInterval(monster.animationInterval);
-      
-      monster.isVisible = false;
-      player.isMoving = false;
-      player.targetX = player.x;
-      player.targetY = player.y;
-      
-      document.getElementById('hud').style.display = 'none';
-      document.getElementById('finalScore').innerText = score;
-      
-      let killsHtml = '';
-      for (let i = 1; i <= score; i++) {
-        killsHtml += '⭐';
-        if (i % 10 === 0) {
-          killsHtml += '<br>'; // 每滿 10 個自動換行
-        }
-      }
-      
-      document.getElementById('star-container').innerHTML = killsHtml;
-      
-      document.getElementById('result-screen').style.display = 'flex';
-    }
-
+    let lastTime = performance.now();
     function gameLoop(currentTime) {
       const dt = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
-      const safeDt = Math.min(dt, 0.1);
-
-      update(safeDt);
-      draw();
+      update(Math.min(dt, 0.1));
+      draw(currentTime); 
       requestAnimationFrame(gameLoop);
     }
 
     function update(dt) {
-      if (!player.isAttacking) {
+      if (player.isMoving) {
         let dx = player.targetX - player.x;
         let dy = player.targetY - player.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
+        let moveDist = player.speed * dt;
 
-        let moveDistanceThisFrame = player.speedPxPerSec * dt;
-
-        if (distance > moveDistanceThisFrame) {
-          player.x += (dx / distance) * moveDistanceThisFrame;
-          player.y += (dy / distance) * moveDistanceThisFrame;
-          player.isMoving = true;
-          player.walkCycle += 25 * dt; 
+        if (distance > moveDist) {
+          player.x += (dx / distance) * moveDist;
+          player.y += (dy / distance) * moveDist;
+          player.walkCycle += 20 * dt;
         } else {
-          if (player.isMoving) {
-            player.x = player.targetX;
-            player.y = player.targetY;
-            player.isMoving = false;
-            player.walkCycle = 0;
-            
-            playSlash();
-          }
+          player.x = player.targetX;
+          player.y = player.targetY;
+          player.isMoving = false;
+          player.walkCycle = 0;
+          savePlayerPosition(); // 玩家走動停下時記錄座標
+          checkZones();
         }
-      } else {
-        player.isMoving = false;
-        player.walkCycle = 0;
       }
     }
 
-    function draw() {
-      ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+    function checkZones() {
+      for (let z of zones) {
+        if (player.x > z.x && player.x < z.x + z.w && player.y > z.y && player.y < z.y + z.h) {
+          savePlayerPosition(); // 走進傳送門跳轉前確保座標已儲存
+          if (z.id === 'wardrobe') window.location.href = 'wardrobe.html';
+          if (z.id === 'map1') window.location.href = 'map1.html';
+          if (z.id === 'map2') window.location.href = 'map2.html';
+          if (z.id === 'map3') window.location.href = 'map3.html';
+          if (z.id === 'map4') window.location.href = 'map4.html';
+          if (z.id === 'map5') window.location.href = 'map5.html';
+        }
+      }
+    }
 
-      if (monster.isVisible) {
-        ctx.drawImage(
-          monsterImages[monster.frame], 
-          monster.x - monster.size / 2, 
-          monster.y - monster.size / 2, 
-          monster.size, 
-          monster.size
-        );
+    function draw(time) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.scale(scale, scale);
+      ctx.translate(-cameraX, -cameraY);
+
+      if (bgImg.complete) {
+        ctx.drawImage(bgImg, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+      } else {
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
       }
 
-      ctx.save(); 
+      for (let z of zones) {
+        ctx.save();
+        let cx = z.x + z.w / 2; 
+        let cy = z.y + z.h / 2; 
+        
+        let portalAngle = (time / 800) * Math.PI * 2; 
 
-      ctx.globalAlpha = 1.0;  
+        if (ctx.createConicGradient) {
+          let grad = ctx.createConicGradient(portalAngle, cx, cy);
+          grad.addColorStop(0, "#ff0000"); 
+          grad.addColorStop(0.15, "#ff7f00"); 
+          grad.addColorStop(0.33, "#ffff00"); 
+          grad.addColorStop(0.5, "#00ff00"); 
+          grad.addColorStop(0.66, "#0000ff"); 
+          grad.addColorStop(0.83, "#ff00ff"); 
+          grad.addColorStop(1, "#ff0000"); 
+          ctx.strokeStyle = grad;
+        } else {
+          ctx.strokeStyle = '#00ffff'; 
+        }
 
-      let offsetY = 0;
-      let rotationAngle = 0;
+        ctx.shadowColor = 'rgba(255, 255, 255, 0.8)'; 
+        ctx.shadowBlur = 20;
+        ctx.lineWidth = 12; 
+        ctx.lineJoin = 'round'; 
+        
+        ctx.strokeRect(z.x - 6, z.y - 6, z.w + 12, z.h + 12); 
+        ctx.restore();
 
-      if (player.isMoving) {
-        offsetY = Math.sin(player.walkCycle * 2) * 6;         
-        rotationAngle = Math.sin(player.walkCycle) * 0.20;   
+        if (z.img && z.img.complete) {
+          ctx.drawImage(z.img, z.x, z.y, z.w, z.h);
+        } else {
+          ctx.fillStyle = z.color; ctx.fillRect(z.x, z.y, z.w, z.h);
+        }
       }
 
+      ctx.save();
+      let offsetY = player.isMoving ? Math.sin(player.walkCycle * 2) * 5 : 0;
+      let rotationAngle = player.isMoving ? Math.sin(player.walkCycle) * 0.15 : 0;
       ctx.translate(player.x, player.y + offsetY);
       ctx.rotate(rotationAngle);
-
-      const currentImg = playerImages[player.frame];
-
-      if (player.isFacingLeft) {
-        ctx.scale(-1, 1);
-        ctx.drawImage(currentImg, -player.size / 2, -player.size / 2, player.size, player.size);
+      if (player.isFacingLeft) ctx.scale(-1, 1);
+      
+      if (playerImg.complete) {
+        ctx.drawImage(playerImg, -player.size/2, -player.size/2, player.size, player.size);
       } else {
-        ctx.drawImage(currentImg, -player.size / 2, -player.size / 2, player.size, player.size);
+        ctx.fillStyle = 'pink';
+        ctx.fillRect(-player.size/2, -player.size/2, player.size, player.size);
       }
+      ctx.restore();
 
       ctx.restore(); 
+      drawOffscreenPointer();
     }
 
-    function playSlash() {
-      if (player.isAttacking) return;
-      player.isAttacking = true;
-      const frameSpeed = 90;
+    function drawOffscreenPointer() {
+      let pxScreen = (player.x - cameraX) * scale;
+      let pyScreen = (player.y - cameraY) * scale;
+      let margin = 40;
+      let isOffscreen = (
+        pxScreen < margin || pxScreen > canvas.width - margin ||
+        pyScreen < margin || pyScreen > canvas.height - margin
+      );
 
-      player.frame = 0; 
-      setTimeout(() => {
-        player.frame = 1; 
-        
-        const currentOffsetX = player.isFacingLeft ? -player.hitboxOffsetX : player.hitboxOffsetX;
-        const attackCenterX = player.x + currentOffsetX;
-        const attackCenterY = player.y + player.hitboxOffsetY;
-        
-        const distToMonster = Math.sqrt(Math.pow(attackCenterX - monster.x, 2) + Math.pow(attackCenterY - monster.y, 2));
-        
-        if (monster.isVisible && distToMonster <= (player.hitboxRadius + monster.size / 2)) {
-          monster.isVisible = false;
-          
-          if (isPlaying) {
-            score++;
-            document.getElementById('scoreDisplay').innerText = score;
-            spawnMonster(); 
-          }
-        }
+      if (isOffscreen) {
+        let cx = canvas.width / 2;
+        let cy = canvas.height / 2;
+        let angle = Math.atan2(pyScreen - cy, pxScreen - cx);
+        let arrowX = Math.max(margin, Math.min(canvas.width - margin, pxScreen));
+        let arrowY = Math.max(margin, Math.min(canvas.height - margin, pyScreen));
 
-        setTimeout(() => {
-          player.frame = 2; 
-          setTimeout(() => {
-            player.frame = 0; 
-            player.isAttacking = false;
-          }, frameSpeed);
-        }, frameSpeed);
-      }, frameSpeed);
+        ctx.save();
+        ctx.translate(arrowX, arrowY);
+        ctx.rotate(angle);
+        
+        ctx.fillStyle = '#ffeb3b'; 
+        ctx.strokeStyle = '#ff5722'; 
+        ctx.lineWidth = 3;
+        ctx.shadowColor = "rgba(0,0,0,0.5)";
+        ctx.shadowBlur = 10;
+        
+        ctx.beginPath();
+        ctx.moveTo(25, 0);       
+        ctx.lineTo(-20, 20);     
+        ctx.lineTo(-10, 0);      
+        ctx.lineTo(-20, -20);    
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        
+        ctx.restore();
+      }
     }
+
+    const activePointers = new Map();
+    let isPointerDown = false; 
+    let isDragActive = false;  
+    let hasMoved = false;
+    let dragStart = { x: 0, y: 0 };
+    let camStart = { x: 0, y: 0 };
+    let initialPinchDist = null;
+    let initialScale = 1;
+    let pinchCenter = { x: 0, y: 0 };
 
     canvas.addEventListener('pointerdown', (e) => {
-      if (!isPlaying || player.isAttacking) return;
+      canvas.setPointerCapture(e.pointerId);
+      activePointers.set(e.pointerId, e);
 
-      const rect = canvas.getBoundingClientRect();
-      const scaleX = canvas.width / rect.width;
-      const scaleY = canvas.height / rect.height;
-      const clickX = (e.clientX - rect.left) * scaleX;
-      const clickY = (e.clientY - rect.top) * scaleY;
-
-      player.isFacingLeft = clickX < player.x;
-
-      if (player.isFacingLeft) {
-        player.targetX = clickX + player.hitboxOffsetX;
-      } else {
-        player.targetX = clickX - player.hitboxOffsetX;
-      }
-      player.targetY = clickY - player.hitboxOffsetY;
-
-      const distToTarget = Math.sqrt(Math.pow(player.targetX - player.x, 2) + Math.pow(player.targetY - player.y, 2));
-      
-      if (distToTarget <= 15) {
-        playSlash();
-      } else {
-        player.isMoving = true;
+      if (activePointers.size === 1) {
+        isPointerDown = true;
+        isDragActive = false; 
+        hasMoved = false;
+        dragStart = { x: e.clientX, y: e.clientY };
+        camStart = { x: cameraX, y: cameraY };
+      } else if (activePointers.size === 2) {
+        isPointerDown = false;
+        isDragActive = false;
+        hasMoved = true; 
+        let pts = Array.from(activePointers.values());
+        initialPinchDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        initialScale = scale;
+        pinchCenter = {
+          x: (pts[0].clientX + pts[1].clientX) / 2,
+          y: (pts[0].clientY + pts[1].clientY) / 2
+        };
       }
     });
+
+    canvas.addEventListener('pointermove', (e) => {
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, e);
+
+      if (activePointers.size === 1 && isPointerDown) {
+        let dx = e.clientX - dragStart.x;
+        let dy = e.clientY - dragStart.y;
+        
+        if (!isDragActive) {
+          if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+            isDragActive = true;
+            hasMoved = true;
+            dragStart = { x: e.clientX, y: e.clientY };
+            camStart = { x: cameraX, y: cameraY };
+          }
+        }
+        
+        if (isDragActive) {
+          cameraX = camStart.x - (e.clientX - dragStart.x) / scale;
+          cameraY = camStart.y - (e.clientY - dragStart.y) / scale;
+          clampCamera();
+        }
+        
+      } else if (activePointers.size === 2) {
+        let pts = Array.from(activePointers.values());
+        let currentDist = Math.hypot(pts[0].clientX - pts[1].clientX, pts[0].clientY - pts[1].clientY);
+        
+        let newScale = initialScale * (currentDist / initialPinchDist);
+        newScale = Math.max(minScale, Math.min(newScale, 2.5)); 
+        
+        let oldWorldX = pinchCenter.x / scale + cameraX;
+        let oldWorldY = pinchCenter.y / scale + cameraY;
+        
+        scale = newScale;
+        cameraX = oldWorldX - pinchCenter.x / scale;
+        cameraY = oldWorldY - pinchCenter.y / scale;
+        
+        clampCamera();
+      }
+    });
+
+    const onPointerUp = (e) => {
+      activePointers.delete(e.pointerId);
+      
+      if (activePointers.size === 0) {
+        if (isPointerDown && !hasMoved) {
+          let clickWorldX = (e.clientX / scale) + cameraX;
+          let clickWorldY = (e.clientY / scale) + cameraY;
+          
+          clickWorldX = Math.max(0, Math.min(clickWorldX, MAP_WIDTH));
+          clickWorldY = Math.max(0, Math.min(clickWorldY, MAP_HEIGHT));
+
+          player.isFacingLeft = clickWorldX < player.x;
+          player.targetX = clickWorldX;
+          player.targetY = clickWorldY;
+          player.isMoving = true;
+        }
+        isPointerDown = false;
+        isDragActive = false;
+      } else if (activePointers.size === 1) {
+        let ptr = Array.from(activePointers.values())[0];
+        isPointerDown = true;
+        isDragActive = true; 
+        hasMoved = true; 
+        dragStart = { x: ptr.clientX, y: ptr.clientY };
+        camStart = { x: cameraX, y: cameraY };
+      }
+    };
+
+    canvas.addEventListener('pointerup', onPointerUp);
+    canvas.addEventListener('pointercancel', onPointerUp);
+    canvas.addEventListener('pointerout', onPointerUp);
+
+    canvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      let zoomFactor = e.deltaY > 0 ? 0.9 : 1.1; 
+      let newScale = Math.max(minScale, Math.min(scale * zoomFactor, 2.5));
+      
+      let mouseX = e.clientX;
+      let mouseY = e.clientY;
+      
+      let oldWorldX = mouseX / scale + cameraX;
+      let oldWorldY = mouseY / scale + cameraY;
+      
+      scale = newScale;
+      cameraX = oldWorldX - mouseX / scale;
+      cameraY = oldWorldY - mouseY / scale;
+      
+      clampCamera();
+    }, { passive: false });
+
+    requestAnimationFrame(gameLoop);
   </script>
 </body>
 </html>
