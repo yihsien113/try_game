@@ -20,13 +20,15 @@
   </style>
 </head>
 <body>
-  <!-- 1. 新增：進度條畫面 -->
+  <!-- 1. 進度條與狀態畫面 -->
   <div id="preloader" style="position:fixed;inset:0;background:#1a1a1a;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif;color:#fff;">
     <div style="font-size:22px;margin-bottom:20px;font-weight:bold;">遊戲素材載入中...</div>
-    <div style="width:280px;height:18px;background:#333;border-radius:9px;overflow:hidden;border:2px solid #555;">
+    <div style="width:300px;height:18px;background:#333;border-radius:9px;overflow:hidden;border:2px solid #555;">
       <div id="progress-bar" style="width:0%;height:100%;background:#4caf50;transition:width 0.1s ease;"></div>
     </div>
-    <div id="progress-text" style="margin-top:12px;font-size:16px;color:#bbb;">0%</div>
+    <div id="progress-text" style="margin-top:12px;font-size:16px;color:#bbb;">0% (0 / 0)</div>
+    <div id="loading-file" style="margin-top:8px;font-size:13px;color:#888;max-width:85vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">準備檢查檔案...</div>
+    <div id="loading-speed" style="margin-top:4px;font-size:13px;color:#4caf50;height:18px;"></div>
   </div>
 
   <div id="hud"> <span id="coinDisplay">0</span> ⭐</div>
