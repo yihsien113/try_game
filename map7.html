@@ -6,7 +6,6 @@
   <title>粢涵尋寶去 - 關卡7 (猜猜我是誰)</title>
   
   <script src="bopomofo.js" onerror="console.log('未載入外部 bopomofo.js')"></script>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@700&display=swap">
   <style>
     * {
       box-sizing: border-box;
@@ -417,30 +416,30 @@
         });
 
         const pCount = w.phonics.length;
-        const slotSize = 54;
-        const gap = 10;
+        const slotSize = 68;    // ★ 調大到 68（拉開格子空間）
+        const gap = 12;         // ★ 格子間隙
         const totalH = pCount * slotSize + (pCount - 1) * gap;
-        const topOffset = (w.tone === '˙') ? 22 : 0;
+        const topOffset = (w.tone === '˙') ? 24 : 0;
         const startY = cy - totalH / 2 + slotSize / 2 + topOffset;
-        const phonicColX = cx + 42;
+        const phonicColX = cx + 46;
 
         w.phonics.forEach((pChar, pIdx) => {
           slots.push({
             x: phonicColX,
             y: startY + pIdx * (slotSize + gap),
-            radius: 27,
+            radius: 34,        // ★ 一般注音格半徑從 27 放大到 34（直徑變 68px）
             expected: pChar,
             isToneSlot: false,
             occupiedTile: null
           });
         });
 
-        // 動態聲調格（一聲為 null 直接略過不設格）
+        // 動態聲調格
         if (w.tone === '˙') {
           slots.push({
             x: phonicColX,
-            y: startY - slotSize / 2 - 28,
-            radius: 23,
+            y: startY - slotSize / 2 - 32,
+            radius: 28,        // ★ 輕聲格半徑從 23 放大到 28
             expected: '˙',
             isToneSlot: true,
             occupiedTile: null
@@ -450,9 +449,9 @@
             ? startY
             : startY + ((pCount - 1) * (slotSize + gap)) * 0.55;
           slots.push({
-            x: phonicColX + 54,
+            x: phonicColX + 64, // ★ 水平間距微調到 64，避免大格子互撞
             y: toneY,
-            radius: 24,
+            radius: 30,        // ★ 聲調格半徑從 24 放大到 30
             expected: w.tone,
             isToneSlot: true,
             occupiedTile: null
@@ -626,21 +625,24 @@
       ctx.textBaseline = 'middle';
       ctx.fillText(`第 ${Math.min(currentQIndex + 1, MAX_QUESTIONS)} / ${MAX_QUESTIONS} 題`, canvas.width / 2, 58);
       ctx.restore();
-
       // 3. 上方雲彩拼字區：國字底板與文字
       wordBoxes.forEach(box => {
         ctx.save();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.16)';
-        ctx.strokeStyle = isSolved ? '#ffe66d' : 'rgba(255, 255, 255, 0.55)';
+        // ★ 底色：改成 85% 不透明度的質感淺灰（完全遮蔽背後白雲）
+        ctx.fillStyle = isSolved ? 'rgba(254, 249, 231, 0.95)' : 'rgba(238, 242, 246, 0.88)';
+        
+        // ★ 邊框：未過關為俐落淺灰藍邊框，過關變亮金色
+        ctx.strokeStyle = isSolved ? '#f1c40f' : 'rgba(148, 163, 184, 0.7)';
         ctx.lineWidth = 4;
         drawRoundRect(ctx, box.x, box.y, box.w, box.h, 26);
         ctx.fill();
         ctx.stroke();
 
+        // ★ 字體：未過關改為深墨藍黑（超清晰高對比），過關改為飽滿深金色
         ctx.font = 'bold 125px "DFKai-SB", "BiauKai", "Microsoft JhengHei", serif';
-        ctx.fillStyle = isSolved ? '#ffeb3b' : 'rgba(255, 255, 255, 0.85)';
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-        ctx.shadowBlur = 8;
+        ctx.fillStyle = isSolved ? '#d97706' : '#1e293b';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.15)'; // 柔和陰影增加層次
+        ctx.shadowBlur = 4;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText(box.char, box.charX, box.charY);
@@ -721,7 +723,7 @@ ctx.restore();
       tiles.forEach(t => {
         ctx.save();
         const isDragging = (t === activeDragTile);
-        const scale = isDragging ? 1.18 : (t.slotIndex !== null ? 0.76 : 1.0);
+        const scale = isDragging ? 1.18 : (t.slotIndex !== null ? 0.92 : 1.0);
 
         ctx.translate(t.x, t.y);
         ctx.scale(scale, scale);
@@ -746,11 +748,47 @@ ctx.restore();
         ctx.stroke();
 
         ctx.shadowBlur = 0;
-        ctx.fillStyle = isDragging ? '#2d3436' : '#ffffff';
-        ctx.font = 'bold 38px "Noto Sans TC", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(t.char, 0, 2);
+        const mainColor = isDragging ? '#2d3436' : '#ffffff';
+
+        if (t.isTone) {
+          // ★ 聲調改用向量繪製：粗細與形狀絕對精準、離線 100% 穩定
+          ctx.strokeStyle = mainColor;
+          ctx.fillStyle = mainColor;
+          ctx.lineWidth = 6;       // 線條粗細（小朋友看得清楚的粗度）
+          ctx.lineCap = 'round';   // 圓潤邊角
+          ctx.lineJoin = 'round';
+
+          ctx.beginPath();
+          if (t.char === 'ˊ') {
+            // 二聲：右上揚
+            ctx.moveTo(-11, 11);
+            ctx.lineTo(11, -11);
+            ctx.stroke();
+          } else if (t.char === 'ˇ') {
+            // 三聲：打勾轉折
+            ctx.moveTo(-15, -6);
+            ctx.lineTo(-4, 9);
+            ctx.lineTo(13, -8);
+            ctx.stroke();
+          } else if (t.char === 'ˋ') {
+            // 四聲：右下重音
+            ctx.moveTo(-11, -11);
+            ctx.lineTo(11, 11);
+            ctx.stroke();
+          } else if (t.char === '˙') {
+            // 輕聲：飽滿小圓點
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else {
+          // 一般注音（聲母/韻母）維持原本字型
+          ctx.fillStyle = mainColor;
+          ctx.font = 'bold 38px "Microsoft JhengHei", sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(t.char, 0, 2);
+        }
+
         ctx.restore();
       });
 
@@ -809,7 +847,7 @@ ctx.restore();
 
       for (let i = tiles.length - 1; i >= 0; i--) {
         const t = tiles[i];
-        const hitRadius = t.slotIndex !== null ? t.radius * 0.9 : t.radius + 14;
+        const hitRadius = t.slotIndex !== null ? t.radius * 1.1 : t.radius + 25;
         if (Math.hypot(pos.x - t.x, pos.y - t.y) <= hitRadius) {
           activeDragTile = t;
           dragOffset.x = pos.x - t.x;
@@ -840,7 +878,7 @@ ctx.restore();
       canvas.releasePointerCapture(e.pointerId);
 
       let bestSlotIdx = null;
-      let minDist = 68;
+      let minDist = 100;
 
       slots.forEach((s, idx) => {
         const d = Math.hypot(activeDragTile.x - s.x, activeDragTile.y - s.y);
