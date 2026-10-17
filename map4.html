@@ -71,7 +71,7 @@
     .overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background-color: rgba(0, 0, 0, 0.7);
+      background-color: rgba(0, 0, 0, 0.85);
       color: #fff;
       display: flex;
       flex-direction: column;
@@ -204,7 +204,6 @@
     
     <!-- 開始畫面 -->
     <div id="start-screen" class="overlay" style="display: none;">
-      <button class="btn" style="position: absolute; top: 15px; left: 15px; margin: 0; padding: 8px 16px; font-size: 18px; background-color: #333;" onclick="window.location.href='index.html'">🔙 EXIT</button>
       
       <div class="intro-copy">
         <h1 class="zh-text" style="display: block; font-size: 60px; margin: 0 0 28px; text-shadow: 0 4px 10px rgba(0,0,0,0.8); color: #fff;">
@@ -236,7 +235,7 @@
 
     <!-- 結算畫面 -->
     <div id="result-screen" class="overlay" style="display: none;">
-      <button class="btn" style="position: absolute; top: 15px; left: 15px; margin: 0; padding: 8px 16px; font-size: 18px; background-color: #333;" onclick="window.location.href='index.html'">🔙 EXIT</button>
+      <!-- 左上角 EXIT 已刪除 -->
       
       <h1 class="zh-text" style="font-size: 48px; color: #ffeb3b; margin: 0 0 10px 0;">
         <ruby>過<rt>ㄍㄨㄛˋ</rt></ruby>
@@ -247,6 +246,9 @@
       
       <div class="math-box">
         <span class="zh-text" style="vertical-align: middle;">
+          <ruby>得<rt>ㄉㄜˊ</rt></ruby>
+          <ruby>分<rt>ㄈㄣ</rt></ruby>
+          <span>:</span>
         </span>
         <span id="newCoins" style="color:#60ff40; font-weight:bold;">+0</span> ⭐ <br>
         <hr style="border-color: rgba(255,255,255,0.2); margin: 10px 0;">
@@ -262,12 +264,21 @@
       
       <div id="star-container"></div>
       
-      <button class="btn" style="font-size: 26px; padding: 12px 40px;" onclick="startGame()">
-        <ruby>再<rt>ㄗㄞˋ</rt></ruby>
-        <ruby>玩<rt>ㄨㄢˊ</rt></ruby>
-        <ruby>一<rt>ㄧ</rt></ruby>
-        <ruby>次<rt>ㄘˋ</rt></ruby>
-      </button>
+      <!-- 按鈕區：橫向排列「再玩一次」與「回大廳」，外觀大小完全一致 -->
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 15px; width: 100%; max-width: 320px;">
+        <button class="btn" style="width: 100%; font-size: 40px; padding: 16px 10px; margin: 0;" onclick="startGame()">
+          <ruby>再<rt>ㄗㄞˋ</rt></ruby>
+          <ruby>玩<rt>ㄨㄢˊ</rt></ruby>
+          <ruby>一<rt>ㄧ</rt></ruby>
+          <ruby>次<rt>ㄘˋ</rt></ruby>
+        </button>
+
+        <button class="btn" style="width: 100%; font-size: 48px; padding: 16px 10px; margin: 0; background-color: #2196F3;" onclick="window.location.href='index.html'">
+          <ruby>回<rt>ㄏㄨㄟˊ</rt></ruby>
+          <ruby>大<rt>ㄉㄚˋ</rt></ruby>
+          <ruby>廳<rt>ㄊㄧㄥ</rt></ruby>
+        </button>
+      </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -692,11 +703,7 @@
           }
       }
 
-      // 白屏淡出
-      if ((gamePhase === 'ending' || gamePhase === 'result') && whiteFade > 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${whiteFade})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      
     }
 
     // 點擊移動（返回起點途中防誤觸）

@@ -70,7 +70,7 @@
     .overlay {
       position: absolute;
       top: 0; left: 0; width: 100%; height: 100%;
-      background-color: rgba(0, 0, 0, 0.7);
+      background-color: rgba(0, 0, 0, 0.85);
       color: #fff;
       display: flex;
       flex-direction: column;
@@ -203,7 +203,6 @@
 
     <!-- 結算畫面 -->
     <div id="result-screen" class="overlay" style="display: none;">
-      <button class="btn" style="position: absolute; top: 15px; left: 15px; margin: 0; padding: 8px 16px; font-size: 18px; background-color: #333;" onclick="window.location.href='index.html'">🔙 EXIT</button>
       
       <h1 class="zh-text" style="font-size: 48px; color: #ffeb3b; margin: 0 0 10px 0;">
         <ruby>過<rt>ㄍㄨㄛˋ</rt></ruby>
@@ -227,12 +226,20 @@
       
       <div id="star-container"></div>
       
-      <button class="btn" style="font-size: 26px; padding: 12px 40px;" onclick="startGame()">
-        <ruby>再<rt>ㄗㄞˋ</rt></ruby>
-        <ruby>玩<rt>ㄨㄢˊ</rt></ruby>
-        <ruby>一<rt>ㄧ</rt></ruby>
-        <ruby>次<rt>ㄘˋ</rt></ruby>
-      </button>
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 15px; margin-top: 15px; width: 100%; max-width: 320px;">
+        <button class="btn" style="width: 100%; font-size: 40px; padding: 16px 10px; margin: 0;" onclick="startGame()">
+          <ruby>再<rt>ㄗㄞˋ</rt></ruby>
+          <ruby>玩<rt>ㄨㄢˊ</rt></ruby>
+          <ruby>一<rt>ㄧ</rt></ruby>
+          <ruby>次<rt>ㄘˋ</rt></ruby>
+        </button>
+
+        <button class="btn" style="width: 100%; font-size: 48px; padding: 16px 10px; margin: 0; background-color: #2196F3;" onclick="window.location.href='index.html'">
+          <ruby>回<rt>ㄏㄨㄟˊ</rt></ruby>
+          <ruby>大<rt>ㄉㄚˋ</rt></ruby>
+          <ruby>廳<rt>ㄊㄧㄥ</rt></ruby>
+        </button>
+      </div>
     </div>
 
     <canvas id="gameCanvas"></canvas>
@@ -517,7 +524,7 @@
             // 答對了！
             if (currentQuestion === TOTAL_QUESTIONS - 1) {
               stars += 8; // 第四關給8星
-              addPopup(`+8 ⭐`, player.x, player.y - 60, '#FFD700', 55);
+              addPopup(`👑 +8 ⭐`, player.x, player.y - 60, '#FFD700', 55);
             } else {
               // 前三關只過關不給星
               addPopup(`🚪 `, player.x, player.y - 60, '#60ff40', 45);
@@ -525,7 +532,8 @@
             updateHUD();
             gamePhase = 'pauseAfterClimb';
             pauseTimer = 1.2; 
-          } else {
+          }
+           else {
             // 答錯了！鎖定錯誤的起點，不扣分，直接摔落
             entryButtons[selectedEntryCol].disabled = true;
             addPopup('❌ ', player.x, player.y - 60, '#FF3B30', 48);
@@ -618,6 +626,7 @@
       ctx.restore();
 
       // 繪製上層平台與門/寶箱
+      // 繪製上層平台與門/寶箱
       for (let i = 0; i < NUM_LINES; i++) {
         ctx.save();
         let px = lineX[i];
@@ -625,7 +634,10 @@
 
         if (i === goalCol) {
           let pulse = Math.sin(now / 200) * 6;
-          let isFinalLevel = (currentQuestion === TOTAL_QUESTIONS - 1);
+          let isFinalLevel = (currentQuestion >= TOTAL_QUESTIONS - 1);
+          
+          // 如果是最後一關，且玩家已經爬到終點或進入結算，皇冠移到角色頭上正上方
+          let showCrownOnHead = isFinalLevel && (gamePhase === 'pauseAfterClimb' || gamePhase === 'ending' || gamePhase === 'result');
           let emoji = isFinalLevel ? '👑' : '🚪';
           let glowColor = isFinalLevel ? '#FFD700' : '#40ff80';
 
@@ -637,10 +649,15 @@
           drawRoundRect(ctx, px - (pWidth / 2), ladderTopY - 22, pWidth, 22, 8);
           ctx.fill();
 
-          ctx.font = `${NUM_LINES >= 7 ? 55 : 75}px sans-serif`;
+          ctx.font = `${NUM_LINES >= 7 ? 60 : 80}px sans-serif`;
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
-          ctx.fillText(emoji, px, py - 15 + pulse * 0.5);
+
+          // 若已拿到皇冠，將皇冠畫在紅圈處（角色頭頂上方），遮住後方暗色拱門
+          let drawY = showCrownOnHead ? (player.y - player.size * 0.55 + pulse * 0.3) : (py - 15 + pulse * 0.5);
+          let drawX = showCrownOnHead ? player.x : px;
+
+          ctx.fillText(emoji, drawX, drawY);
         } else {
           ctx.fillStyle = 'rgba(255,255,255,0.25)';
           let pWidth = NUM_LINES >= 7 ? 50 : 80;
@@ -776,10 +793,7 @@
       }
 
       // 白屏
-      if ((gamePhase === 'ending' || gamePhase === 'result') && whiteFade > 0) {
-        ctx.fillStyle = `rgba(255, 255, 255, ${whiteFade})`;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
+      
     }
 
     // 點擊事件
