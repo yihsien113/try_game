@@ -356,15 +356,18 @@
     bgImg.src = 'assets/map/map7.webp';
 
     function finishLoading() {
-      document.getElementById('loading-screen').style.display = 'none';
-      document.getElementById('game-container').style.display = 'block';
-      document.getElementById('game-container').style.aspectRatio = `${canvas.width} / ${canvas.height}`;
-      document.getElementById('start-screen').style.display = 'flex';
-      if (window.Bopomofo && window.Bopomofo.render) window.Bopomofo.render();
-      draw();
-      lastTime = performance.now();
-      requestAnimationFrame(gameLoop);
-    }
+  // 等待外部字型（Google Font）在平板上完全載入完畢
+  document.fonts.ready.then(() => {
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('game-container').style.display = 'block';
+    document.getElementById('game-container').style.aspectRatio = `${canvas.width} / ${canvas.height}`;
+    document.getElementById('start-screen').style.display = 'flex';
+    if (window.Bopomofo && window.Bopomofo.render) window.Bopomofo.render();
+    draw();
+    lastTime = performance.now();
+    requestAnimationFrame(gameLoop);
+  });
+}
 
     bgImg.onload = () => {
       canvas.width = bgImg.width || 900;
@@ -681,29 +684,34 @@ let floatY = Math.sin(now / 350) * 8;
 ctx.translate(MAGIC_CENTER.x, MAGIC_CENTER.y + floatY);
 ctx.scale(revealScale, revealScale);
 
-ctx.font = '270px sans-serif';
-ctx.textAlign = 'center';
-ctx.textBaseline = 'middle';
-
 if (!isSolved) {
-  // --- 封印狀態：強制壓黑剪影（相容 iPad/Safari） ---
-  // 先加上周圍的魔法光暈
+  // --- 建立暫存小畫布，100% 相容 iPad 轉為純黑剪影 ---
+  const offCanvas = document.createElement('canvas');
+  offCanvas.width = 400;
+  offCanvas.height = 400;
+  const offCtx = offCanvas.getContext('2d');
+
+  offCtx.font = '270px sans-serif';
+  offCtx.textAlign = 'center';
+  offCtx.textBaseline = 'middle';
+  offCtx.fillText(currentQ.emoji, 200, 200); // 在暫存畫布中央畫動物
+
+  // 將動物形狀壓成純黑剪影
+  offCtx.globalCompositeOperation = 'source-in';
+  offCtx.fillStyle = '#000000';
+  offCtx.fillRect(0, 0, 400, 400);
+
+  // 加上神秘青色光暈後，印回主畫面魔法陣上
   ctx.shadowColor = '#00e5ff';
   ctx.shadowBlur = 25;
-  ctx.fillText(currentQ.emoji, 0, 0); // 畫出有光暈的本體
-
-  // 核心魔法：只覆蓋動物像素，將內部全部填成黑色
-  ctx.shadowBlur = 0; // 關閉陰影避免黑方塊溢出
-  ctx.globalCompositeOperation = 'source-atop';
-  ctx.fillStyle = '#000000'; // 純黑剪影
-  ctx.fillRect(-200, -200, 400, 400); // 畫一個大黑方塊把動物蓋黑
-
-  // 還原正常繪圖模式
-  ctx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(offCanvas, -200, -200);
 } else {
-  // --- 解鎖狀態：恢復彩色並加上金色光芒 ---
+  // 解鎖狀態：恢復彩色原圖 + 金色光芒
   ctx.shadowColor = '#ffe66d';
   ctx.shadowBlur = 35;
+  ctx.font = '270px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
   ctx.fillText(currentQ.emoji, 0, 0);
 }
 
